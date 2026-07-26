@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     console.error('API Error in /api/analyze:', error);
-    return NextResponse.json({ error: 'Failed to extract resume data.' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to extract resume data.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -100,8 +100,8 @@ export default function ResumeAnalyzerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resumeText: uploadJson.text }),
       });
-      const analysisJson = (await analysisResponse.json()) as ExtractedResumeData;
-      if (!analysisResponse.ok) throw new Error('Failed to run resume AI parser.');
+      const analysisJson = await analysisResponse.json();
+      if (!analysisResponse.ok) throw new Error(analysisJson.error || 'Failed to run resume AI parser.');
 
       setUploadProgress(90);
 
