@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased transition-colors duration-300;
+    background-image: radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 34%), radial-gradient(circle at 90% 10%, rgba(16, 185, 129, 0.06), transparent 25%);
+  }
+
+  .dark body {
+    background-image: radial-gradient(circle at top left, rgba(79, 70, 229, 0.2), transparent 34%), radial-gradient(circle at 90% 10%, rgba(16, 185, 129, 0.16), transparent 25%);
+  }
+}
+
+* {
+  @apply box-border;
+}
+
+::selection {
+  @apply bg-brand-500/50 text-white;
+}
