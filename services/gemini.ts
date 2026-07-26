@@ -68,9 +68,12 @@ function fallbackExtractFromText(resumeText: string): ExtractedResumeData {
   const phoneMatch = resumeText.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
   const phone = phoneMatch ? phoneMatch[0] : 'N/A';
 
-  // Extract Skills
+  // Extract Skills safely without invalid RegExp quantifiers (e.g. C++)
   const knownSkills = ['JavaScript', 'TypeScript', 'React', 'Next.js', 'Node.js', 'Python', 'Java', 'C++', 'SQL', 'PostgreSQL', 'HTML', 'CSS', 'Tailwind', 'Git', 'AWS', 'Docker', 'REST API', 'GraphQL', 'Machine Learning', 'AI'];
-  const extractedSkills = knownSkills.filter(s => new RegExp(`\\b${s}\\b`, 'i').test(resumeText));
+  const extractedSkills = knownSkills.filter(s => {
+    const escaped = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|\\b|\\W)${escaped}(?:$|\\b|\\W)`, 'i').test(resumeText);
+  });
   const finalSkills = extractedSkills.length > 0 ? extractedSkills : ['Software Development', 'Problem Solving', 'Engineering'];
 
   return {
