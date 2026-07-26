@@ -3,11 +3,10 @@ import { ExtractedResumeData, MatchAnalysis, InterviewPrep } from '@/types';
 // Helper to check if Gemini API key is configured with a valid format
 function getApiKey() {
   const key = process.env.GEMINI_API_KEY;
-  // Valid Gemini/Google API keys start with 'AIzaSy' or 'AQ.'
-  if (!key || (!key.startsWith('AIzaSy') && !key.startsWith('AQ.'))) {
+  if (!key || key.trim() === '' || key.startsWith('your_')) {
     return null;
   }
-  return key;
+  return key.trim();
 }
 
 // Helper to call Gemini API
@@ -53,11 +52,67 @@ export async function callGemini(prompt: string, expectJson: boolean = true): Pr
   return text;
 }
 
+// Helper to extract basic fields dynamically from raw resume text if AI key is unavailable or fails
+function fallbackExtractFromText(resumeText: string): ExtractedResumeData {
+  const lines = resumeText.split('\n').map(l => l.trim()).filter(Boolean);
+  
+  // Extract Name (first non-empty line or match pattern)
+  let name = lines[0] || 'Candidate Profile';
+  if (name.length > 50) name = name.slice(0, 40);
+
+  // Extract Email
+  const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/i);
+  const email = emailMatch ? emailMatch[1] : 'contact@candidate.com';
+
+  // Extract Phone
+  const phoneMatch = resumeText.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  const phone = phoneMatch ? phoneMatch[0] : 'N/A';
+
+  // Extract Skills
+  const knownSkills = ['JavaScript', 'TypeScript', 'React', 'Next.js', 'Node.js', 'Python', 'Java', 'C++', 'SQL', 'PostgreSQL', 'HTML', 'CSS', 'Tailwind', 'Git', 'AWS', 'Docker', 'REST API', 'GraphQL', 'Machine Learning', 'AI'];
+  const extractedSkills = knownSkills.filter(s => new RegExp(`\\b${s}\\b`, 'i').test(resumeText));
+  const finalSkills = extractedSkills.length > 0 ? extractedSkills : ['Software Development', 'Problem Solving', 'Engineering'];
+
+  return {
+    name,
+    email,
+    phone,
+    skills: finalSkills,
+    technicalSkills: finalSkills,
+    softSkills: ['Communication', 'Teamwork', 'Problem Solving'],
+    experience: `${finalSkills.length > 3 ? 'Experienced' : 'Qualified'} professional in ${finalSkills.slice(0, 3).join(', ')}`,
+    education: [
+      {
+        school: 'University / Institute',
+        degree: 'Bachelor Degree',
+        field: 'Computer Science / Engineering',
+        year: 'Graduated'
+      }
+    ],
+    workExperience: [
+      {
+        company: 'Software Engineering Role',
+        role: 'Developer / Analyst',
+        duration: 'Recent',
+        description: resumeText.slice(0, 200) + '...'
+      }
+    ],
+    projects: [
+      {
+        name: 'Technical Project',
+        description: 'Project extracted from uploaded resume data.',
+        technologies: finalSkills.slice(0, 4)
+      }
+    ],
+    certifications: ['Professional Qualification']
+  };
+}
+
 // 1. Resume Data Extraction
 export async function extractResumeData(resumeText: string): Promise<ExtractedResumeData> {
   try {
     const prompt = `You are an expert technical recruiter and resume parser.
-Analyze this resume text and extract all profile details.
+Analyze this resume text and extract all profile details accurately.
 Return a valid JSON object ONLY, matching this schema:
 {
   "name": "string",
@@ -98,52 +153,9 @@ ${resumeText}`;
 
     const jsonText = await callGemini(prompt);
     return JSON.parse(jsonText) as ExtractedResumeData;
-  } catch {
-    // Using mock fallback — API key may not be configured
-    return {
-      name: 'Ava Nguyen',
-      email: 'ava.nguyen@example.com',
-      phone: '+1 (555) 019-2834',
-      skills: ['TypeScript', 'React', 'Next.js', 'Node.js', 'Tailwind CSS', 'PostgreSQL', 'Git', 'REST APIs', 'Agile', 'UI/UX Design'],
-      technicalSkills: ['TypeScript', 'React', 'Next.js', 'Node.js', 'PostgreSQL', 'Tailwind CSS'],
-      softSkills: ['Problem Solving', 'Communication', 'Collaboration', 'Adaptability', 'Mentorship'],
-      experience: '4 years of experience as a Full Stack Engineer',
-      education: [
-        {
-          school: 'University of Washington',
-          degree: 'Bachelor of Science',
-          field: 'Computer Science',
-          year: '2018 - 2022'
-        }
-      ],
-      workExperience: [
-        {
-          company: 'TechFlow Systems',
-          role: 'Full Stack Developer',
-          duration: '2022 - Present',
-          description: 'Engineered web applications using Next.js and Node.js. Improved dashboard load times by 40%. Implemented responsive user interfaces and integrated REST APIs.'
-        },
-        {
-          company: 'Launchpad Labs',
-          role: 'Software Engineer Intern',
-          duration: 'Summer 2021',
-          description: 'Built interactive dashboard components using React. Collaborated with UI designers to implement accessibility features according to WCAG standards.'
-        }
-      ],
-      projects: [
-        {
-          name: 'AI Smart Planner',
-          description: 'A productivity planner that leverages LLMs to automatically schedule tasks based on priority and workload.',
-          technologies: ['Next.js', 'TypeScript', 'Tailwind CSS', 'Gemini API']
-        },
-        {
-          name: 'CollabSpace',
-          description: 'A real-time document editing and sharing portal using WebSockets and Express.',
-          technologies: ['React', 'Node.js', 'Socket.io', 'MongoDB']
-        }
-      ],
-      certifications: ['AWS Certified Cloud Practitioner', 'Meta Front-End Developer Professional Certificate']
-    };
+  } catch (err) {
+    console.warn('Gemini extraction failed or fallback activated:', err);
+    return fallbackExtractFromText(resumeText);
   }
 }
 

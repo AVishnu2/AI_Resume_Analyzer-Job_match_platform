@@ -118,9 +118,8 @@ export default function ResumeAnalyzerPage() {
       setSelectedResume(savedRecord);
       setUploadProgress(100);
 
-      // 5. Update user profile details automatically
+      // 5. Update user profile details automatically (preserving signed-in user name)
       await updateProfile({
-        name: analysisJson.name,
         preferredRole: analysisJson.experience?.split('as a')?.[1]?.trim() || 'Software Engineer',
         skills: analysisJson.skills || []
       });
