@@ -9,105 +9,347 @@ function getApiKey() {
   return key.trim();
 }
 
-// Helper to call Gemini API
+// Helper to call Gemini API with retry logic for rate limits
 export async function callGemini(prompt: string, expectJson: boolean = true): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('Gemini API key is not configured or has invalid format.');
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }]
-        }
-      ],
-      ...(expectJson ? {
-        generationConfig: {
-          responseMimeType: 'application/json',
-        }
-      } : {})
-    }),
-  });
+  // Models to try in order (primary, then fallback)
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  const maxRetries = 3;
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini API request failed: ${response.status} - ${errorBody}`);
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }]
+            }
+          ],
+          ...(expectJson ? {
+            generationConfig: {
+              responseMimeType: 'application/json',
+            }
+          } : {})
+        }),
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) {
+          throw new Error('Gemini API returned an empty response.');
+        }
+        return text;
+      }
+
+      // If rate limited (429), wait and retry
+      if (response.status === 429) {
+        const waitSeconds = Math.pow(2, attempt) * 5; // 5s, 10s, 20s
+        console.warn(`Gemini rate limited on ${model} (attempt ${attempt + 1}/${maxRetries}). Retrying in ${waitSeconds}s...`);
+        await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+        continue;
+      }
+
+      // Other errors - don't retry, break to try next model
+      const errorBody = await response.text();
+      console.error(`Gemini API error with ${model}: ${response.status} - ${errorBody}`);
+      break;
+    }
   }
 
-  const payload = await response.json();
-  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error('Gemini API returned an empty response.');
-  }
-
-  return text;
+  throw new Error('Gemini API request failed after all retries and model fallbacks. You may have exceeded the free-tier quota. Please wait a minute and try again.');
 }
 
-// Helper to extract basic fields dynamically from raw resume text if AI key is unavailable or fails
+// Smart fallback parser: extracts structured data from raw resume text using section-heading detection
 function fallbackExtractFromText(resumeText: string): ExtractedResumeData {
   const lines = resumeText.split('\n').map(l => l.trim()).filter(Boolean);
-  
-  // Extract Name (first non-empty line or match pattern)
-  let name = lines[0] || 'Candidate Profile';
-  if (name.length > 50) name = name.slice(0, 40);
 
-  // Extract Email
-  const emailMatch = resumeText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/i);
-  const email = emailMatch ? emailMatch[1] : 'contact@candidate.com';
+  // --- Extract Name (first non-empty line, usually the candidate's name) ---
+  let name = lines[0] || 'Candidate';
+  // If first line looks like a heading/section title, skip it
+  if (/^(resume|curriculum|cv|portfolio|profile)/i.test(name)) {
+    name = lines[1] || 'Candidate';
+  }
+  if (name.length > 60) name = name.slice(0, 50);
 
-  // Extract Phone
-  const phoneMatch = resumeText.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-  const phone = phoneMatch ? phoneMatch[0] : 'N/A';
+  // --- Extract Email ---
+  const emailMatch = resumeText.match(/([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/i);
+  const email = emailMatch ? emailMatch[1] : '';
 
-  // Extract Skills safely without invalid RegExp quantifiers (e.g. C++)
-  const knownSkills = ['JavaScript', 'TypeScript', 'React', 'Next.js', 'Node.js', 'Python', 'Java', 'C++', 'SQL', 'PostgreSQL', 'HTML', 'CSS', 'Tailwind', 'Git', 'AWS', 'Docker', 'REST API', 'GraphQL', 'Machine Learning', 'AI'];
+  // --- Extract Phone ---
+  const phoneMatch = resumeText.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3,5}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/);
+  const phone = phoneMatch ? phoneMatch[0].trim() : '';
+
+  // --- Extract LinkedIn / GitHub ---
+  const linkedinMatch = resumeText.match(/linkedin\.com\/in\/[\w-]+/i);
+  const githubMatch = resumeText.match(/github\.com\/[\w-]+/i);
+
+  // --- Section Detection ---
+  // Identify sections by headings
+  type Section = 'education' | 'experience' | 'projects' | 'skills' | 'certifications' | 'summary' | 'unknown';
+  const sectionPatterns: { key: Section; pattern: RegExp }[] = [
+    { key: 'education', pattern: /^(education|academic|qualification|degree)/i },
+    { key: 'experience', pattern: /^(experience|work\s*experience|employment|professional\s*experience|work\s*history|internship)/i },
+    { key: 'projects', pattern: /^(project|personal\s*project|academic\s*project|key\s*project)/i },
+    { key: 'skills', pattern: /^(skill|technical\s*skill|core\s*competenc|technologies|tech\s*stack|tools|programming)/i },
+    { key: 'certifications', pattern: /^(certification|certificate|license|award|achievement|honor)/i },
+    { key: 'summary', pattern: /^(summary|objective|about|profile\s*summary|career\s*objective)/i },
+  ];
+
+  const sections: Record<Section, string[]> = {
+    education: [], experience: [], projects: [], skills: [], certifications: [], summary: [], unknown: []
+  };
+
+  let currentSection: Section = 'unknown';
+  for (const line of lines) {
+    // Check if this line is a section heading
+    let matched = false;
+    for (const sp of sectionPatterns) {
+      if (sp.pattern.test(line) && line.length < 60) {
+        currentSection = sp.key;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      sections[currentSection].push(line);
+    }
+  }
+
+  // --- Extract Skills ---
+  const knownSkills = [
+    'JavaScript', 'TypeScript', 'React', 'React.js', 'Next.js', 'Angular', 'Vue.js', 'Svelte',
+    'Node.js', 'Express', 'Express.js', 'Python', 'Django', 'Flask', 'FastAPI',
+    'Java', 'Spring Boot', 'Kotlin', 'C', 'C++', 'C#', 'Rust', 'Go', 'Ruby', 'PHP', 'Swift',
+    'SQL', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'Firebase', 'Supabase', 'DynamoDB',
+    'HTML', 'CSS', 'SCSS', 'Sass', 'Tailwind', 'TailwindCSS', 'Bootstrap', 'Material UI',
+    'Git', 'GitHub', 'GitLab', 'Bitbucket',
+    'AWS', 'Azure', 'GCP', 'Google Cloud', 'Heroku', 'Vercel', 'Netlify',
+    'Docker', 'Kubernetes', 'CI/CD', 'Jenkins', 'Terraform',
+    'REST API', 'GraphQL', 'gRPC', 'WebSockets',
+    'Machine Learning', 'Deep Learning', 'AI', 'NLP', 'Computer Vision',
+    'TensorFlow', 'PyTorch', 'scikit-learn', 'Pandas', 'NumPy',
+    'Linux', 'Bash', 'PowerShell', 'Agile', 'Scrum', 'JIRA',
+    'Figma', 'Adobe XD', 'Photoshop',
+  ];
+  const skillSectionText = sections.skills.join(' ') + ' ' + resumeText;
   const extractedSkills = knownSkills.filter(s => {
     const escaped = s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`(?:^|\\b|\\W)${escaped}(?:$|\\b|\\W)`, 'i').test(resumeText);
+    return new RegExp(`(?:^|[\\b\\s,;|/•·])${escaped}(?:$|[\\b\\s,;|/•·])`, 'i').test(skillSectionText);
   });
-  const finalSkills = extractedSkills.length > 0 ? extractedSkills : ['Software Development', 'Problem Solving', 'Engineering'];
+  // Deduplicate (e.g. React and React.js)
+  const uniqueSkills = [...new Set(extractedSkills)];
+  const technicalSkills = uniqueSkills.length > 0 ? uniqueSkills : ['Software Development'];
+
+  const softSkillsList = ['Communication', 'Teamwork', 'Leadership', 'Problem Solving', 'Time Management', 'Adaptability', 'Critical Thinking', 'Collaboration', 'Mentorship'];
+  const extractedSoftSkills = softSkillsList.filter(s =>
+    new RegExp(`\\b${s}\\b`, 'i').test(resumeText)
+  );
+  const softSkills = extractedSoftSkills.length > 0 ? extractedSoftSkills : ['Communication', 'Teamwork', 'Problem Solving'];
+
+  // --- Extract Education ---
+  const education: ExtractedResumeData['education'] = [];
+  const eduLines = sections.education;
+  if (eduLines.length > 0) {
+    // Try to parse education entries: look for degree keywords, institution names, years
+    let currentEdu: { school: string; degree: string; field: string; year: string } = { school: '', degree: '', field: '', year: '' };
+    const degreePattern = /\b(B\.?Tech|B\.?S\.?c?|B\.?E|B\.?A|M\.?Tech|M\.?S\.?c?|M\.?E|M\.?B\.?A|M\.?A|Ph\.?D|Bachelor|Master|Diploma|Associate|Doctor)\b/i;
+    const yearPattern = /\b(19|20)\d{2}\b/g;
+
+    for (const line of eduLines) {
+      const degreeMatch = line.match(degreePattern);
+      const yearMatches = line.match(yearPattern);
+
+      if (degreeMatch) {
+        // If we have a pending entry, push it
+        if (currentEdu.school || currentEdu.degree) {
+          education.push({ ...currentEdu });
+          currentEdu = { school: '', degree: '', field: '', year: '' };
+        }
+        currentEdu.degree = line;
+      } else if (yearMatches) {
+        currentEdu.year = yearMatches.join(' - ');
+        if (!currentEdu.school && !currentEdu.degree) {
+          currentEdu.school = line.replace(yearPattern, '').replace(/[,\-–|]/g, '').trim();
+        }
+      } else if (!currentEdu.school) {
+        currentEdu.school = line;
+      } else if (!currentEdu.field) {
+        currentEdu.field = line;
+      }
+    }
+    if (currentEdu.school || currentEdu.degree) {
+      education.push(currentEdu);
+    }
+  }
+  // Clean up education entries
+  for (const edu of education) {
+    if (!edu.school) edu.school = 'University / Institute';
+    if (!edu.degree) edu.degree = 'Degree Program';
+    if (!edu.field) edu.field = edu.degree; // use degree line as field if separate field not found
+  }
+  if (education.length === 0) {
+    // Try to find any education mention in the full text
+    const eduTextMatch = resumeText.match(/(B\.?Tech|B\.?S|M\.?S|M\.?Tech|Bachelor|Master|Ph\.?D|Diploma)[^\n]{0,100}/i);
+    education.push({
+      school: 'University / Institute',
+      degree: eduTextMatch ? eduTextMatch[0].trim() : 'Degree',
+      field: 'Engineering / Computer Science',
+      year: ''
+    });
+  }
+
+  // --- Extract Work Experience ---
+  const workExperience: ExtractedResumeData['workExperience'] = [];
+  const expLines = sections.experience;
+  if (expLines.length > 0) {
+    let currentJob: { company: string; role: string; duration: string; description: string } = { company: '', role: '', duration: '', description: '' };
+    const dateRangePattern = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\s*\.?\s*\d{0,4}\s*[-–to]+\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)?\s*\.?\s*\d{0,4}\s*(Present|Current|Now|Till\s*Date|Ongoing)?\b/i;
+    const yearRangePattern = /\b(19|20)\d{2}\s*[-–to]+\s*((19|20)\d{2}|Present|Current|Now)\b/i;
+
+    for (const line of expLines) {
+      const dateMatch = line.match(dateRangePattern) || line.match(yearRangePattern);
+
+      if (dateMatch) {
+        // This line likely starts a new job entry
+        if (currentJob.company || currentJob.role) {
+          workExperience.push({ ...currentJob });
+        }
+        currentJob = { company: '', role: '', duration: dateMatch[0], description: '' };
+        const remaining = line.replace(dateMatch[0], '').replace(/[|,\-–]/g, ' ').trim();
+        if (remaining) {
+          // Could be "Company — Role" or "Role at Company"
+          currentJob.role = remaining;
+        }
+      } else if (!currentJob.company && currentJob.duration && line.length < 80) {
+        // First line after a date is likely company or role
+        currentJob.company = line;
+      } else if (currentJob.duration) {
+        // Accumulate description lines
+        currentJob.description += (currentJob.description ? ' ' : '') + line;
+      } else if (line.length < 80 && !currentJob.role) {
+        // Before any date match, treat short lines as role/company
+        currentJob.role = line;
+      } else {
+        currentJob.description += (currentJob.description ? ' ' : '') + line;
+      }
+    }
+    if (currentJob.company || currentJob.role || currentJob.description) {
+      workExperience.push(currentJob);
+    }
+  }
+  // Clean up work experience
+  for (const job of workExperience) {
+    if (!job.company) job.company = job.role || 'Company';
+    if (!job.role) job.role = 'Role';
+    if (!job.duration) job.duration = '';
+    if (job.description.length > 300) job.description = job.description.slice(0, 300) + '...';
+  }
+  if (workExperience.length === 0 && expLines.length > 0) {
+    // Couldn't parse structured entries, dump as single entry
+    workExperience.push({
+      company: 'Professional Experience',
+      role: 'See resume details',
+      duration: '',
+      description: expLines.slice(0, 5).join('. ')
+    });
+  }
+
+  // --- Extract Projects ---
+  const projects: ExtractedResumeData['projects'] = [];
+  const projLines = sections.projects;
+  if (projLines.length > 0) {
+    let currentProj: { name: string; description: string; technologies: string[] } = { name: '', description: '', technologies: [] };
+
+    for (const line of projLines) {
+      // Short lines that look like titles (not starting with bullet/dash descriptions)
+      if (line.length < 80 && !/^[-•*▪►]/.test(line) && !currentProj.name) {
+        if (currentProj.name) {
+          projects.push({ ...currentProj });
+        }
+        currentProj = { name: line, description: '', technologies: [] };
+      } else if (currentProj.name) {
+        currentProj.description += (currentProj.description ? ' ' : '') + line.replace(/^[-•*▪►]\s*/, '');
+      } else {
+        // No project name yet, this might be the first project title
+        currentProj.name = line.replace(/^[-•*▪►]\s*/, '');
+      }
+
+      // Check for tech stack mentions in this line
+      if (/\b(tech|stack|built\s*with|using|tools?)\b/i.test(line)) {
+        // After removing the keyword, remaining text might be tech list
+        const techList = line.replace(/^.*?(tech|stack|built\s*with|using|tools?)\s*:?\s*/i, '').split(/[,;|•·]+/).map(t => t.trim()).filter(t => t.length > 1 && t.length < 30);
+        if (techList.length > 0) currentProj.technologies = techList;
+      }
+    }
+    if (currentProj.name) {
+      // Assign technologies from detected skills if not explicitly found
+      if (currentProj.technologies.length === 0) {
+        currentProj.technologies = technicalSkills.slice(0, 4);
+      }
+      projects.push(currentProj);
+    }
+  }
+  // Clean project descriptions
+  for (const proj of projects) {
+    if (proj.description.length > 250) proj.description = proj.description.slice(0, 250) + '...';
+    if (proj.technologies.length === 0) proj.technologies = technicalSkills.slice(0, 3);
+  }
+
+  // --- Extract Certifications ---
+  const certifications: string[] = [];
+  const certLines = sections.certifications;
+  for (const line of certLines) {
+    const cleaned = line.replace(/^[-•*▪►\d.)\s]+/, '').trim();
+    if (cleaned.length > 3 && cleaned.length < 120) {
+      certifications.push(cleaned);
+    }
+  }
+
+  // --- Extract Summary / Experience description ---
+  const summaryLines = sections.summary;
+  let experienceSummary = '';
+  if (summaryLines.length > 0) {
+    experienceSummary = summaryLines.slice(0, 3).join(' ');
+  }
+  if (!experienceSummary) {
+    // Build from detected skills and work experience
+    const yearsMatch = resumeText.match(/(\d+)\+?\s*(years?|yrs?)\s*(of\s*)?(experience|exp)?/i);
+    if (yearsMatch) {
+      experienceSummary = `${yearsMatch[1]}+ years of experience in ${technicalSkills.slice(0, 3).join(', ')}`;
+    } else if (workExperience.length > 0) {
+      experienceSummary = `Professional with experience in ${technicalSkills.slice(0, 3).join(', ')}`;
+    } else {
+      experienceSummary = `${technicalSkills.length > 3 ? 'Experienced' : 'Qualified'} professional in ${technicalSkills.slice(0, 3).join(', ')}`;
+    }
+  }
+  if (experienceSummary.length > 200) experienceSummary = experienceSummary.slice(0, 200) + '...';
 
   return {
     name,
     email,
     phone,
-    skills: finalSkills,
-    technicalSkills: finalSkills,
-    softSkills: ['Communication', 'Teamwork', 'Problem Solving'],
-    experience: `${finalSkills.length > 3 ? 'Experienced' : 'Qualified'} professional in ${finalSkills.slice(0, 3).join(', ')}`,
-    education: [
-      {
-        school: 'University / Institute',
-        degree: 'Bachelor Degree',
-        field: 'Computer Science / Engineering',
-        year: 'Graduated'
-      }
-    ],
-    workExperience: [
-      {
-        company: 'Software Engineering Role',
-        role: 'Developer / Analyst',
-        duration: 'Recent',
-        description: resumeText.slice(0, 200) + '...'
-      }
-    ],
-    projects: [
-      {
-        name: 'Technical Project',
-        description: 'Project extracted from uploaded resume data.',
-        technologies: finalSkills.slice(0, 4)
-      }
-    ],
-    certifications: ['Professional Qualification']
+    skills: [...technicalSkills, ...softSkills],
+    technicalSkills,
+    softSkills,
+    experience: experienceSummary,
+    education,
+    workExperience,
+    projects,
+    certifications: certifications.length > 0 ? certifications : [],
+    ...(linkedinMatch ? { linkedin: linkedinMatch[0] } : {}),
+    ...(githubMatch ? { github: githubMatch[0] } : {}),
   };
 }
 
