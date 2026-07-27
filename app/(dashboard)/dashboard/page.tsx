@@ -75,7 +75,7 @@ export default function DashboardPage() {
   if (profile?.name) completeness += 20;
   if (profile?.email) completeness += 20;
   if (profile?.skills && profile.skills.length > 0) completeness += 25;
-  if (latestResume?.extracted_data?.workExperience && latestResume.extracted_data.workExperience.length > 0) completeness += 20;
+  if (latestResume?.extracted_data?.experience && latestResume.extracted_data.experience.length > 0) completeness += 20;
   if (latestResume?.extracted_data?.projects && latestResume.extracted_data.projects.length > 0) completeness += 15;
   if (completeness === 0) completeness = 20; // default initial completeness
 
@@ -101,10 +101,21 @@ export default function DashboardPage() {
   ];
 
   // Chart 2 Data: Top Technical Skills frequency in resume
-  const skillsData = latestResume?.extracted_data?.technicalSkills || latestResume?.extracted_data?.skills || profile?.skills || [];
-  const chartSkillsData = skillsData.slice(0, 5).map((skill, idx) => ({
+  const extractSkillsList = (data: any): string[] => {
+    if (data?.skills?.languages || data?.skills?.frameworks || data?.skills?.databases) {
+      return [
+        ...(data.skills.languages || []),
+        ...(data.skills.frameworks || []),
+        ...(data.skills.databases || []),
+      ];
+    }
+    if (Array.isArray(data?.skills)) return data.skills;
+    return profile?.skills || [];
+  };
+  const skillsData: string[] = extractSkillsList(latestResume?.extracted_data);
+  const chartSkillsData = skillsData.slice(0, 5).map((skill: string, idx: number) => ({
     name: skill,
-    frequency: 100 - idx * 12, // mock value to show scale
+    frequency: 100 - idx * 12,
   }));
 
   const defaultSkillsData = [

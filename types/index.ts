@@ -28,18 +28,63 @@ export interface ProjectEntry {
   technologies: string[];
 }
 
-export interface ExtractedResumeData {
+export interface PersonalInfo {
   name: string;
   email: string;
   phone: string;
-  skills: string[];
-  technicalSkills: string[];
+  location: string;
+  linkedin: string;
+  github: string;
+  portfolio: string;
+}
+
+export interface CategorizedSkills {
+  languages: string[];
+  frameworks: string[];
+  libraries: string[];
+  databases: string[];
+  tools: string[];
+  cloud: string[];
   softSkills: string[];
-  experience: string;
+}
+
+export interface InternshipEntry {
+  company: string;
+  role: string;
+  duration: string;
+  description: string;
+}
+
+export interface AchievementEntry {
+  title: string;
+  description: string;
+}
+
+export interface PublicationEntry {
+  title: string;
+  publisher: string;
+  year: string;
+  link: string;
+}
+
+export interface LanguageEntry {
+  language: string;
+  proficiency: string;
+}
+
+// Enterprise-grade extracted resume data structure
+export interface ExtractedResumeData {
+  personalInfo: PersonalInfo;
+  summary: string;
   education: EducationEntry[];
-  workExperience: ExperienceEntry[];
+  experience: ExperienceEntry[];
   projects: ProjectEntry[];
+  skills: CategorizedSkills;
   certifications: string[];
+  internships: InternshipEntry[];
+  achievements: AchievementEntry[];
+  publications: PublicationEntry[];
+  languagesKnown: LanguageEntry[];
 }
 
 export interface ResumeRecord {

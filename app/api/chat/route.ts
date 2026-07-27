@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
-import { callGemini } from '@/services/gemini';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+function getApiKey(): string | null {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || key.trim() === '' || key.startsWith('your_')) {
+    return null;
+  }
+  return key.trim();
+}
 
 function localFallbackReply(question: string = '') {
   const text = question.toLowerCase();
@@ -24,7 +32,7 @@ function localFallbackReply(question: string = '') {
     return 'Job matching advice: compare your resume keywords and technical skills directly with the target description. Note any gaps in tools, languages, or certifications, and adjust your application to reflect the strongest matches.';
   }
 
-  return 'I’m here to help with your career. Ask me about resume tips, ATS keyword optimization, interview questions, salary negotiation, or how to better match your experience to a job posting.';
+  return 'I\'m here to help with your career. Ask me about resume tips, ATS keyword optimization, interview questions, salary negotiation, or how to better match your experience to a job posting.';
 }
 
 export async function POST(request: Request) {
@@ -56,7 +64,21 @@ ${message}
 
 Provide a clear, practical, encouraging answer. Keep responses concise (under 200 words) using clean markdown formatting.`;
 
-    const reply = await callGemini(prompt, false, 0.9);
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error('API key not configured');
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 500,
+      },
+      systemInstruction: 'You are ResumeAI Assistant, a career advisor. Keep responses concise and helpful.',
+    });
+
+    const result = await model.generateContent(prompt);
+    const reply = result.response.text() || localFallbackReply(userMessage);
     return NextResponse.json({ reply });
   } catch (error) {
     console.error('API Error in /api/chat:', error);

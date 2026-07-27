@@ -105,12 +105,34 @@ export default function ResumeAnalyzerPage() {
 
       setUploadProgress(90);
 
+      const extractedData: ExtractedResumeData = {
+        personalInfo: analysisJson.personalInfo,
+        summary: analysisJson.summary || '',
+        education: analysisJson.education || [],
+        experience: analysisJson.experience || [],
+        projects: analysisJson.projects || [],
+        skills: analysisJson.skills || {
+          languages: [],
+          frameworks: [],
+          libraries: [],
+          databases: [],
+          tools: [],
+          cloud: [],
+          softSkills: [],
+        },
+        certifications: analysisJson.certifications || [],
+        internships: analysisJson.internships || [],
+        achievements: analysisJson.achievements || [],
+        publications: analysisJson.publications || [],
+        languagesKnown: analysisJson.languagesKnown || [],
+      };
+
       // 3. Save to LocalStorage / Supabase
       const savedRecord = await dbSaveResume(
         user.id,
         file.name,
         uploadJson.text,
-        analysisJson
+        extractedData
       );
 
       // 4. Update local state
@@ -118,11 +140,17 @@ export default function ResumeAnalyzerPage() {
       setSelectedResume(savedRecord);
       setUploadProgress(100);
 
-      // 5. Update user profile details automatically (preserving signed-in user name)
-      await updateProfile({
-        preferredRole: analysisJson.experience?.split('as a')?.[1]?.trim() || 'Software Engineer',
-        skills: analysisJson.skills || []
-      });
+        // 5. Update user profile details automatically
+        const allSkills = [
+          ...(extractedData.skills?.languages || []),
+          ...(extractedData.skills?.frameworks || []),
+          ...(extractedData.skills?.databases || []),
+          ...(extractedData.skills?.tools || []),
+          ...(extractedData.skills?.cloud || []),
+        ];
+        await updateProfile({
+          skills: allSkills
+        });
 
     } catch (err) {
       console.error(err);
@@ -134,6 +162,24 @@ export default function ResumeAnalyzerPage() {
         setUploadProgress(0);
       }, 500);
     }
+  }
+
+  // Helper to get all skills as flat array for display
+  function getAllSkills(data: ExtractedResumeData | undefined): string[] {
+    if (!data) return [];
+    const s = data.skills;
+    return [
+      ...(s?.languages || []),
+      ...(s?.frameworks || []),
+      ...(s?.libraries || []),
+      ...(s?.databases || []),
+      ...(s?.tools || []),
+      ...(s?.cloud || []),
+    ];
+  }
+
+  function getSoftSkills(data: ExtractedResumeData | undefined): string[] {
+    return data?.skills?.softSkills || [];
   }
 
   const profileData = selectedResume?.extracted_data;
@@ -267,11 +313,15 @@ export default function ResumeAnalyzerPage() {
                 <div className="border-b border-slate-200 dark:border-white/5 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="h-11 w-11 rounded-full bg-gradient-to-tr from-indigo-500 to-emerald-400 flex items-center justify-center font-extrabold text-white">
-                      {profileData.name?.[0] || 'A'}
+                      {profileData.personalInfo?.name?.[0] || 'A'}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-lg">{profileData.name}</h3>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">{profileData.email} • {profileData.phone}</p>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-lg">{profileData.personalInfo?.name}</h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        {profileData.personalInfo?.email} 
+                        {profileData.personalInfo?.phone ? ` • ${profileData.personalInfo.phone}` : ''}
+                        {profileData.personalInfo?.location ? ` • ${profileData.personalInfo.location}` : ''}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -302,26 +352,60 @@ export default function ResumeAnalyzerPage() {
                 <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1 text-sm">
                   {activeTab === 'profile' && (
                     <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Overview</span>
-                        <p className="text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
-                          {profileData.experience}
-                        </p>
+                      {profileData.summary && (
+                        <div className="space-y-1.5">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Summary / Objective</span>
+                          <p className="text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
+                            {profileData.summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* LinkedIn, GitHub, Portfolio */}
+                      <div className="flex flex-wrap gap-2">
+                        {profileData.personalInfo?.linkedin && (
+                          <a href={`https://${profileData.personalInfo.linkedin.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                            LinkedIn
+                          </a>
+                        )}
+                        {profileData.personalInfo?.github && (
+                          <a href={`https://${profileData.personalInfo.github.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                            GitHub
+                          </a>
+                        )}
+                        {profileData.personalInfo?.portfolio && (
+                          <a href={`https://${profileData.personalInfo.portfolio.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                            Portfolio
+                          </a>
+                        )}
                       </div>
 
                       {profileData.education && profileData.education.length > 0 && (
                         <div className="space-y-2">
                           <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Education</span>
                           <div className="space-y-2">
-                            {profileData.education.map((edu, idx) => (
+                            {(profileData.education as Array<{school: string; degree: string; field: string; year: string}>).map((edu, idx) => (
                               <div key={idx} className="flex gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
                                 <GraduationCap className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
                                 <div className="space-y-0.5">
                                   <p className="font-semibold text-slate-900 dark:text-white">{edu.school}</p>
-                                  <p className="text-xs text-slate-700 dark:text-slate-300">{edu.degree} in {edu.field}</p>
+                                  <p className="text-xs text-slate-700 dark:text-slate-300">{edu.degree}{edu.field ? ` in ${edu.field}` : ''}</p>
                                   <p className="text-[10px] text-slate-500 font-semibold mt-1">{edu.year}</p>
                                 </div>
                               </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {profileData.languagesKnown && profileData.languagesKnown.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Languages</span>
+                          <div className="flex flex-wrap gap-2">
+                            {(profileData.languagesKnown as Array<{language: string; proficiency: string}>).map((lang, idx) => (
+                              <Badge key={idx} variant="gray">
+                                {lang.language}{lang.proficiency ? ` - ${lang.proficiency}` : ''}
+                              </Badge>
                             ))}
                           </div>
                         </div>
@@ -331,14 +415,14 @@ export default function ResumeAnalyzerPage() {
 
                   {activeTab === 'experience' && (
                     <div className="space-y-3">
-                      {profileData.workExperience && profileData.workExperience.length > 0 ? (
-                        profileData.workExperience.map((exp, idx) => (
+                      {(profileData.experience && profileData.experience.length > 0) ? (
+                        (profileData.experience as Array<{company: string; role: string; duration: string; description: string}>).map((exp, idx) => (
                           <div key={idx} className="flex gap-4 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
                             <Briefcase className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                             <div className="space-y-1.5">
                               <div>
                                 <p className="font-semibold text-slate-900 dark:text-white">{exp.role}</p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">{exp.company} • {exp.duration}</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">{exp.company}{exp.duration ? ` • ${exp.duration}` : ''}</p>
                               </div>
                               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{exp.description}</p>
                             </div>
@@ -347,13 +431,32 @@ export default function ResumeAnalyzerPage() {
                       ) : (
                         <p className="text-slate-500 text-center py-6">No experience logs extracted.</p>
                       )}
+
+                      {/* Internships */}
+                      {profileData.internships && profileData.internships.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Internships</span>
+                          {(profileData.internships as Array<{company: string; role: string; duration: string; description: string}>).map((intern, idx) => (
+                            <div key={`intern-${idx}`} className="flex gap-4 bg-amber-50 dark:bg-amber-950/50 p-4 rounded-2xl border border-amber-200 dark:border-amber-800/20">
+                              <Briefcase className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                              <div className="space-y-1.5">
+                                <div>
+                                  <p className="font-semibold text-slate-900 dark:text-white">{intern.role}</p>
+                                  <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">{intern.company}{intern.duration ? ` • ${intern.duration}` : ''}</p>
+                                </div>
+                                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{intern.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {activeTab === 'projects' && (
                     <div className="space-y-3">
                       {profileData.projects && profileData.projects.length > 0 ? (
-                        profileData.projects.map((proj, idx) => (
+                        (profileData.projects as Array<{name: string; description: string; technologies: string[]}>).map((proj, idx) => (
                           <div key={idx} className="flex gap-4 bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
                             <Code2 className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
                             <div className="space-y-2">
@@ -362,8 +465,8 @@ export default function ResumeAnalyzerPage() {
                                 <p className="text-xs text-slate-700 dark:text-slate-300 mt-1 leading-relaxed">{proj.description}</p>
                               </div>
                               <div className="flex flex-wrap gap-1.5 pt-1">
-                                {proj.technologies?.map((tech) => (
-                                  <Badge key={tech} variant="gray" className="text-[10px]">
+                                {proj.technologies?.map((tech, techIdx) => (
+                                  <Badge key={`${idx}-${techIdx}-${tech}`} variant="gray" className="text-[10px]">
                                     {tech}
                                   </Badge>
                                 ))}
@@ -379,27 +482,79 @@ export default function ResumeAnalyzerPage() {
 
                   {activeTab === 'skills' && (
                     <div className="space-y-4">
-                      {profileData.technicalSkills && profileData.technicalSkills.length > 0 && (
+                      {/* Categorized skills */}
+                      {profileData.skills?.languages && profileData.skills.languages.length > 0 && (
                         <div className="space-y-2">
-                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Technical skills</span>
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Languages</span>
                           <div className="flex flex-wrap gap-2">
-                            {profileData.technicalSkills.map((s) => (
-                              <Badge key={s} variant="brand">
-                                {s}
-                              </Badge>
+                            {profileData.skills.languages.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="brand">{s}</Badge>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {profileData.softSkills && profileData.softSkills.length > 0 && (
+                      {profileData.skills?.frameworks && profileData.skills.frameworks.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Frameworks</span>
+                          <div className="flex flex-wrap gap-2">
+                            {profileData.skills.frameworks.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="brand">{s}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {profileData.skills?.libraries && profileData.skills.libraries.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Libraries</span>
+                          <div className="flex flex-wrap gap-2">
+                            {profileData.skills.libraries.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="brand">{s}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {profileData.skills?.databases && profileData.skills.databases.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Databases</span>
+                          <div className="flex flex-wrap gap-2">
+                            {profileData.skills.databases.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="brand">{s}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {profileData.skills?.tools && profileData.skills.tools.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Tools</span>
+                          <div className="flex flex-wrap gap-2">
+                            {profileData.skills.tools.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="brand">{s}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {profileData.skills?.cloud && profileData.skills.cloud.length > 0 && (
+                        <div className="space-y-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Cloud</span>
+                          <div className="flex flex-wrap gap-2">
+                            {profileData.skills.cloud.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="brand">{s}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {profileData.skills?.softSkills && profileData.skills.softSkills.length > 0 && (
                         <div className="space-y-2">
                           <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Soft skills</span>
                           <div className="flex flex-wrap gap-2">
-                            {profileData.softSkills.map((s) => (
-                              <Badge key={s} variant="success">
-                                {s}
-                              </Badge>
+                            {profileData.skills.softSkills.map((s, idx) => (
+                              <Badge key={`${s}-${idx}`} variant="success">{s}</Badge>
                             ))}
                           </div>
                         </div>
@@ -409,9 +564,39 @@ export default function ResumeAnalyzerPage() {
                         <div className="space-y-2 pt-2">
                           <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Certifications</span>
                           <div className="grid gap-2">
-                            {profileData.certifications.map((cert) => (
-                              <div key={cert} className="rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
+                            {(profileData.certifications as string[]).map((cert, certIdx) => (
+                              <div key={`${cert}-${certIdx}`} className="rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
                                 {cert}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Achievements */}
+                      {profileData.achievements && profileData.achievements.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Achievements</span>
+                          <div className="space-y-2">
+                            {(profileData.achievements as Array<{title: string; description: string}>).map((ach, idx) => (
+                              <div key={idx} className="rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950 p-3 text-xs">
+                                <p className="font-semibold text-slate-900 dark:text-white">{ach.title}</p>
+                                {ach.description && <p className="text-slate-600 dark:text-slate-400 mt-1">{ach.description}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Publications */}
+                      {profileData.publications && profileData.publications.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Publications</span>
+                          <div className="space-y-2">
+                            {(profileData.publications as Array<{title: string; publisher: string; year: string}>).map((pub, idx) => (
+                              <div key={idx} className="rounded-xl border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950 p-3 text-xs">
+                                <p className="font-semibold text-slate-900 dark:text-white">{pub.title}</p>
+                                <p className="text-slate-500 mt-1">{pub.publisher}{pub.year ? ` (${pub.year})` : ''}</p>
                               </div>
                             ))}
                           </div>
