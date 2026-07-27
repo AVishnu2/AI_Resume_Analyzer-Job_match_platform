@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
-  History, Calendar, Clock, ChevronRight, ArrowLeft,
+  History, Calendar, Clock, ChevronRight, ArrowLeft, Trash2,
   Gauge as GaugeIcon, AlertCircle, BookOpen, Award, CheckCircle2,
   ChevronDown, Terminal, Loader2
 } from 'lucide-react';
@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
 import { DashboardShell } from '@/components/dashboard-shell';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Gauge, Badge, Skeleton } from '@/components/ui';
-import { dbGetAnalyses } from '@/lib/db';
+import { dbGetAnalyses, dbClearAnalyses } from '@/lib/db';
 import { MatchAnalysis } from '@/types';
 
 export default function HistoryPage() {
@@ -19,6 +19,8 @@ export default function HistoryPage() {
   const [analyses, setAnalyses] = useState<MatchAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAnalysis, setSelectedAnalysis] = useState<MatchAnalysis | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
   
   // Tab states for detail view
   const [activeResultTab, setActiveResultTab] = useState<'fit' | 'gaps' | 'roadmap' | 'interview'>('fit');
@@ -51,6 +53,20 @@ export default function HistoryPage() {
     setSelectedAnalysis(record);
     setActiveResultTab('fit');
     setRevealedAnswers({});
+  }
+
+  async function handleClearHistory() {
+    if (!user) return;
+    setClearing(true);
+    try {
+      await dbClearAnalyses(user.id);
+      setAnalyses([]);
+      setShowClearConfirm(false);
+    } catch (err) {
+      console.error('Failed to clear history:', err);
+    } finally {
+      setClearing(false);
+    }
   }
 
   return (
@@ -95,11 +111,26 @@ export default function HistoryPage() {
         {!loading && !selectedAnalysis && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <History className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />
-                Your Job Match History
-              </CardTitle>
-              <CardDescription>Click on any job comparison below to inspect scores and resume suggestions.</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <History className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />
+                    Your Job Match History
+                  </CardTitle>
+                  <CardDescription>Click on any job comparison below to inspect scores and resume suggestions.</CardDescription>
+                </div>
+                {analyses.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowClearConfirm(true)}
+                    className="text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear History
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {analyses.length > 0 ? (
@@ -140,7 +171,7 @@ export default function HistoryPage() {
                 </div>
               ) : (
                 <div className="text-center py-12 text-slate-500 dark:text-slate-400 space-y-4">
-                  <p className="max-w-xs mx-auto text-sm leading-relaxed">You haven&apos;t generated any comparison reports yet. Head over to the Job Matcher to scan roles.</p>
+                  <p className="max-w-xs mx-auto text-sm leading-relaxed">You haven't generated any comparison reports yet. Head over to the Job Matcher to scan roles.</p>
                   <Link href="/dashboard/job-matcher" className="inline-block">
                     <Button variant="gradient" className="gap-2">
                       Go to Job Matcher <ChevronRight className="h-4 w-4" />
@@ -150,6 +181,54 @@ export default function HistoryPage() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Clear History Confirmation Dialog */}
+        {showClearConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 p-6 max-w-md w-full shadow-2xl"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                  <div className="rounded-full bg-rose-100 dark:bg-rose-950/50 p-2">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Clear All History?</h3>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                  This will permanently delete all your job match analysis history. This action cannot be undone.
+                </p>
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowClearConfirm(false)}
+                    disabled={clearing}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="gradient"
+                    onClick={handleClearHistory}
+                    disabled={clearing}
+                    className="flex-1 bg-rose-600 hover:bg-rose-700"
+                  >
+                    {clearing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Clearing...
+                      </>
+                    ) : (
+                      'Clear All'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
 
         {/* Detailed Report View */}

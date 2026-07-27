@@ -216,3 +216,22 @@ export async function dbSaveAnalysis(
 
   return fullAnalysis;
 }
+
+export async function dbClearAnalyses(userId: string): Promise<void> {
+  // Clear from Supabase if configured
+  if (isSupabaseConfigured()) {
+    try {
+      await supabase
+        .from('resume_analysis')
+        .delete()
+        .eq('user_id', userId);
+    } catch (e) {
+      console.warn('Supabase clearAnalyses error:', e);
+    }
+  }
+
+  // Clear from LocalStorage
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(`${LOCAL_ANALYSES_KEY}-${userId}`);
+  }
+}

@@ -9,66 +9,61 @@ function getApiKey() {
   return key.trim();
 }
 
-// Helper to call Gemini API with retry logic for rate limits
-export async function callGemini(prompt: string, expectJson: boolean = true): Promise<string> {
+// Helper to call Gemini API with fast retry logic
+export async function callGemini(prompt: string, expectJson: boolean = true, temperature: number = 0.7): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('Gemini API key is not configured or has invalid format.');
   }
 
-  // Models to try in order (primary, then fallback)
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
-  const maxRetries = 3;
+  const model = expectJson ? 'gemini-2.0-flash' : 'gemini-2.0-flash-lite';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  for (const model of models) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // Try once with a single quick retry on rate limit
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s total timeout
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
       const response = await fetch(url, {
+        signal: controller.signal,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }]
-            }
-          ],
-          ...(expectJson ? {
-            generationConfig: {
-              responseMimeType: 'application/json',
-            }
-          } : {})
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          ...(expectJson ? { generationConfig: { responseMimeType: 'application/json', temperature } } : { generationConfig: { temperature } })
         }),
       });
+
+      clearTimeout(timeout);
 
       if (response.ok) {
         const payload = await response.json();
         const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) {
-          throw new Error('Gemini API returned an empty response.');
-        }
+        if (!text) throw new Error('Gemini API returned an empty response.');
         return text;
       }
 
-      // If rate limited (429), wait and retry
-      if (response.status === 429) {
-        const waitSeconds = Math.pow(2, attempt) * 5; // 5s, 10s, 20s
-        console.warn(`Gemini rate limited on ${model} (attempt ${attempt + 1}/${maxRetries}). Retrying in ${waitSeconds}s...`);
-        await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+      if (response.status === 429 && attempt === 0) {
+        // Rate limited — wait 3s then retry once
+        await new Promise(resolve => setTimeout(resolve, 3000));
         continue;
       }
 
-      // Other errors - don't retry, break to try next model
-      const errorBody = await response.text();
-      console.error(`Gemini API error with ${model}: ${response.status} - ${errorBody}`);
-      break;
+      // Any other error — abort immediately
+      throw new Error(`Gemini API error: ${response.status}`);
+    } catch (err: any) {
+      clearTimeout(timeout);
+      if (err.name === 'AbortError' && attempt === 0) {
+        // Timeout on first attempt — retry once
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+      throw err;
     }
   }
 
-  throw new Error('Gemini API request failed after all retries and model fallbacks. You may have exceeded the free-tier quota. Please wait a minute and try again.');
+  throw new Error('Gemini API request failed. Using local fallback parser.');
 }
 
 // Smart fallback parser: extracts structured data from raw resume text using section-heading detection
@@ -398,8 +393,7 @@ ${resumeText}`;
 
     const jsonText = await callGemini(prompt);
     return JSON.parse(jsonText) as ExtractedResumeData;
-  } catch (err) {
-    console.warn('Gemini extraction failed or fallback activated:', err);
+  } catch {
     return fallbackExtractFromText(resumeText);
   }
 }

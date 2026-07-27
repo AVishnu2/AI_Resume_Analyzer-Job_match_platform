@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, Badge } from '@/components/ui';
 import { useTheme } from '@/components/theme-provider';
+import { ChatbotWidget } from '@/components/chatbot-widget';
 
 // Features data
 const features = [
@@ -525,6 +526,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Chatbot Widget */}
+      <ChatbotWidget />
 
       {/* Footer */}
       <footer className="border-t border-slate-200 dark:border-white/5 py-12 text-slate-500 text-sm">

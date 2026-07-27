@@ -56,16 +56,16 @@ export default function SettingsPage() {
                   {theme === 'dark' ? <Moon className="h-4.5 w-4.5 text-indigo-400" /> : <Sun className="h-4.5 w-4.5 text-amber-400" />}
                   Appearance Theme
                 </h3>
-                <p className="text-xs text-slate-700 dark:text-slate-300">Switch between standard dark mode and light mode interfaces.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">Switch between standard dark mode and light mode interfaces.</p>
               </div>
 
-              <div className="flex items-center bg-slate-950 p-1 border border-white/5 rounded-full shrink-0">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 border border-slate-200 dark:border-white/5 rounded-full shrink-0">
                 <button
                   onClick={() => setTheme('dark')}
                   className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full transition ${
                     theme === 'dark' 
                       ? 'bg-brand-500 text-white shadow' 
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white'
                   }`}
                 >
                   <Moon className="h-3.5 w-3.5" /> Dark Mode
@@ -75,7 +75,7 @@ export default function SettingsPage() {
                   className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full transition ${
                     theme === 'light' 
                       ? 'bg-white text-slate-950 shadow' 
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white'
                   }`}
                 >
                   <Sun className="h-3.5 w-3.5" /> Light Mode
@@ -88,17 +88,17 @@ export default function SettingsPage() {
           <Card>
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-1">
-                <h3 className="font-semibold text-white flex items-center gap-2">
+                <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                   <Bell className="h-4.5 w-4.5 text-indigo-400" />
                   Email Notifications
                 </h3>
-                <p className="text-xs text-slate-400">Receive system notifications and analysis completions to your email.</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Receive system notifications and analysis completions to your email.</p>
               </div>
 
               <button
                 onClick={() => setNotifications(!notifications)}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  notifications ? 'bg-indigo-500' : 'bg-slate-800'
+                  notifications ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-800'
                 }`}
               >
                 <span
@@ -112,18 +112,18 @@ export default function SettingsPage() {
 
           {/* Logout & Delete Area */}
           <Card className="border-rose-500/10">
-            <CardHeader className="border-b border-white/5 pb-4 mb-4">
-              <CardTitle className="text-base text-rose-300 flex items-center gap-2">
+            <CardHeader className="border-b border-slate-200 dark:border-white/5 pb-4 mb-4">
+              <CardTitle className="text-base text-rose-600 dark:text-rose-300 flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-rose-400" /> Danger Zone
               </CardTitle>
               <CardDescription>Actions that cannot be undone, including permanent account deletion.</CardDescription>
             </CardHeader>
             
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl bg-white/5 border border-white/5 p-4 gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 p-4 gap-4">
                 <div>
-                  <p className="font-semibold text-white text-sm">Sign out of session</p>
-                  <p className="text-xs text-slate-400 mt-0.5">End your current session on this device.</p>
+                  <p className="font-semibold text-slate-900 dark:text-white text-sm">Sign out of session</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">End your current session on this device.</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => signOut()} className="gap-2 shrink-0">
                   <LogOut className="h-4 w-4" /> Logout
@@ -132,8 +132,8 @@ export default function SettingsPage() {
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl bg-rose-500/5 border border-rose-500/10 p-4 gap-4">
                 <div>
-                  <p className="font-semibold text-rose-300 text-sm">Delete Account</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Permanently erase your uploaded files and history from our database.</p>
+                  <p className="font-semibold text-rose-600 dark:text-rose-300 text-sm">Delete Account</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">Permanently erase your uploaded files and history from our database.</p>
                 </div>
                 <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)} className="gap-2 shrink-0">
                   <Trash2 className="h-4 w-4" /> Delete Account
@@ -152,19 +152,19 @@ export default function SettingsPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="w-full max-w-md rounded-3xl border border-rose-500/20 bg-slate-900 p-6 shadow-2xl text-left space-y-6"
+                className="w-full max-w-md rounded-3xl border border-rose-500/20 bg-white dark:bg-slate-900 p-6 shadow-2xl text-left space-y-6"
               >
-                <div className="flex items-center gap-3.5 border-b border-white/5 pb-4">
+                <div className="flex items-center gap-3.5 border-b border-slate-200 dark:border-white/5 pb-4">
                   <div className="rounded-full bg-rose-500/10 p-2.5 text-rose-400">
                     <Trash2 className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-white text-lg">Are you absolutely sure?</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">This action is irreversible.</p>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-lg">Are you absolutely sure?</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">This action is irreversible.</p>
                   </div>
                 </div>
 
-                <div className="text-xs leading-relaxed text-slate-300">
+                <div className="text-xs leading-relaxed text-slate-700 dark:text-slate-300">
                   Deleting your account will permanently wipe all uploaded resume documents, job comparison logs, and generated interview materials. Your data cannot be recovered.
                 </div>
 
