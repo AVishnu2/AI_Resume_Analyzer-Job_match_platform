@@ -1,11 +1,5 @@
 # ResumeAI - AI Resume Analyzer & Job Match Platform
 
-![Next.js](https://img.shields.io/badge/Next.js-15-black)
-![React](https://img.shields.io/badge/React-19-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)
-![Tailwind](https://img.shields.io/badge/Tailwind-3.4-cyan)
-![Vercel](https://img.shields.io/badge/Deploy-Vercel-black)
-
 **ResumeAI** is an intelligent, AI-powered career platform that revolutionizes the job application process by leveraging Google's advanced Gemini AI technology. The platform helps job seekers optimize their resumes, match with ideal job opportunities, and prepare for interviews through automated, data-driven insights.
 
 ## 🎯 Problem Statement
