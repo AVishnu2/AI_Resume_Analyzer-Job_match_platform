@@ -171,7 +171,7 @@ export default function HistoryPage() {
                 </div>
               ) : (
                 <div className="text-center py-12 text-slate-500 dark:text-slate-400 space-y-4">
-                  <p className="max-w-xs mx-auto text-sm leading-relaxed">You haven't generated any comparison reports yet. Head over to the Job Matcher to scan roles.</p>
+                  <p className="max-w-xs mx-auto text-sm leading-relaxed">You have not generated any comparison reports yet. Head over to the Job Matcher to scan roles.</p>
                   <Link href="/dashboard/job-matcher" className="inline-block">
                     <Button variant="gradient" className="gap-2">
                       Go to Job Matcher <ChevronRight className="h-4 w-4" />
