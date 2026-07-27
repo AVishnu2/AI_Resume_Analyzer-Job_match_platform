@@ -96,6 +96,60 @@ If using Supabase for production database persistence, run `supabase/schema.sql`
 
 ---
 
+## 🔄 CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment to Vercel.
+
+### Pipeline Workflow
+
+The CI/CD pipeline (`.github/workflows/vercel-deploy.yml`) automatically:
+
+1. **Triggers**: On every push to `main` branch or pull request
+2. **Quality Checks**:
+   - Type checking with TypeScript
+   - Linting with ESLint
+   - Build verification
+3. **Deployment**: Automatically deploys to Vercel production on main branch pushes
+
+### Required GitHub Secrets
+
+To enable automated deployment, add these secrets to your GitHub repository:
+
+1. Go to your repository → Settings → Secrets and variables → Actions
+2. Add the following secrets:
+   - `VERCEL_TOKEN`: Your Vercel authentication token
+   - `VERCEL_ORG_ID`: Your Vercel organization ID
+   - `VERCEL_PROJECT_ID`: Your Vercel project ID
+
+### Getting Vercel Credentials
+
+1. **VERCEL_TOKEN**:
+   - Go to [Vercel Dashboard](https://vercel.com/account/tokens)
+   - Click "New Token"
+   - Copy the generated token
+
+2. **VERCEL_ORG_ID** and **VERCEL_PROJECT_ID**:
+   - Import your project to Vercel (if not already done)
+   - Go to Project Settings → General
+   - Find "Project ID" and "Org ID" under the project details
+
+### Manual Deployment
+
+You can also deploy manually using Vercel CLI:
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy to preview
+vercel
+
+# Deploy to production
+vercel --prod
+```
+
+---
+
 ## 📜 License
 
 Distributed under the MIT License.
