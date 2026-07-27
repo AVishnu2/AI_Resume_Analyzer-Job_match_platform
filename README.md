@@ -31,20 +31,68 @@ ResumeAI is a production-ready SaaS application designed for intelligent resume 
 
 ---
 
-## 📂 Folder Structure
+## 📂 Project Structure
 
 ```text
-├── app/                        # Next.js App Router (Pages, Layouts, API routes)
-│   ├── (auth)/                 # Authentication pages (login, register)
-│   ├── (dashboard)/            # Dashboard sub-routes (job-matcher, history, profile, settings)
-│   └── api/                    # Serverless API endpoints (job-match, interview-prep, parse-pdf)
-├── components/                 # Reusable UI components & Layout Shells
-├── hooks/                      # Custom React Hooks (e.g. useAuth)
-├── lib/                        # Client libraries & Database interface abstraction (db.ts, supabase.ts)
-├── services/                   # AI services & Gemini integration routines
-├── supabase/                   # Database schema SQL files
-├── types/                      # TypeScript definitions & data models
-└── utils/                      # Helper & formatting utilities
+├── FRONTEND/
+│   ├── app/                          # Next.js 15 App Router
+│   │   ├── (auth)/                   # Authentication pages (login, register)
+│   │   ├── (dashboard)/              # Dashboard pages (job-matcher, history, profile, settings)
+│   │   ├── (marketing)/              # Marketing pages (landing page)
+│   │   ├── api/                      # Backend API routes (serverless functions)
+│   │   ├── globals.css               # Global styles & Tailwind imports
+│   │   └── layout.tsx                # Root layout with theme provider
+│   ├── components/                   # Reusable React components
+│   │   ├── ui.tsx                    # Base UI component library (Button, Card, Badge, etc.)
+│   │   ├── auth-shell.tsx            # Authentication layout wrapper
+│   │   ├── dashboard-shell.tsx       # Dashboard layout wrapper
+│   │   ├── chatbot-widget.tsx        # AI Career Assistant chatbot
+│   │   └── theme-provider.tsx        # Dark/light theme context
+│   └── hooks/                        # Custom React hooks
+│       └── use-auth.ts               # Authentication state management
+│
+├── BACKEND/
+│   ├── app/api/                      # Next.js API Routes (Serverless Functions)
+│   │   ├── chat/route.ts             # Chatbot AI endpoint
+│   │   ├── job-match/route.ts        # Job matching analysis endpoint
+│   │   ├── interview-prep/route.ts   # Interview questions generation endpoint
+│   │   └── parse-pdf/route.ts        # PDF resume parsing endpoint
+│   ├── services/                     # Business logic & AI services
+│   │   └── gemini.ts                 # Google Gemini AI integration
+│   └── lib/                          # Core libraries & data access
+│       ├── db.ts                     # Database operations (Supabase + LocalStorage)
+│       ├── supabase.ts               # Supabase client configuration
+│       └── utils.ts                  # Helper functions
+│
+├── DATABASE/
+│   └── supabase/
+│       └── schema.sql                # PostgreSQL schema for Supabase
+│
+├── TYPES/
+│   └── types/
+│       ├── index.ts                  # TypeScript type definitions
+│       ├── lucide-react.d.ts         # Lucide icon type declarations
+│       └── pdf-parse.d.ts            # PDF parser type declarations
+│
+├── CONFIGURATION/
+│   ├── .env.example                  # Environment variables template
+│   ├── .gitignore                    # Git ignore rules
+│   ├── next.config.js                # Next.js configuration
+│   ├── tailwind.config.ts            # Tailwind CSS configuration
+│   ├── tsconfig.json                 # TypeScript configuration
+│   ├── postcss.config.js             # PostCSS configuration
+│   ├── vercel.json                   # Vercel deployment configuration
+│   └── eslint.config.mjs             # ESLint configuration
+│
+├── CI/CD/
+│   └── .github/
+│       └── workflows/
+│           └── vercel-deploy.yml     # GitHub Actions CI/CD pipeline
+│
+└── DOCUMENTATION/
+    ├── README.md                     # Project overview & quick start
+    └── docs/
+        └── DEPLOYMENT.md             # Comprehensive deployment guide
 ```
 
 ---
